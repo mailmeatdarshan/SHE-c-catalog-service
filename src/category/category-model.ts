@@ -32,7 +32,7 @@ export interface Category {
     name: string;
     slug?: string;
     description?: string;
-    parentCategory?: mongoose.Types.ObjectId | null;
+    parentCategory?: mongoose.Types.ObjectId | string | null;
     priceConfiguration: PriceConfiguration;
     attributes: Attribute[];
 }
