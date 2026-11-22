@@ -4,6 +4,7 @@ import categoryValidator from "./category-validator";
 import { CategoryService } from "./category-service";
 import logger from "../config/logger";
 import { CreateCategoryRequest } from "./category-types";
+import { asyncWrapper } from "../common/utils/asyncWrapper";
 
 const router = express.Router();
 
@@ -13,9 +14,9 @@ const categoryController = new CategoryController(categoryService, logger);
 router.post(
     "/",
     categoryValidator,
-    (req: Request, res: Response, next: NextFunction) => {
-        void categoryController.create(req as CreateCategoryRequest, res, next);
-    },
+    asyncWrapper((req: Request, res: Response, next: NextFunction) =>
+        categoryController.create(req as CreateCategoryRequest, res, next),
+    ),
 );
 
 export default router;
