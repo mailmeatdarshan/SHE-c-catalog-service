@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import type { AuthRequest } from "../types/index.js";
+import type { AuthRequest } from "../types";
 import createHttpError from "http-errors";
 
 export const canAccess = (roles: string[]) => {

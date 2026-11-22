@@ -1,6 +1,15 @@
 import request from "supertest";
 
 import { calculateDiscount } from "./src/utils";
+
+jest.mock("./src/common/middlewares/authenticate", () =>
+    jest.fn((req, res, next) => next()),
+);
+
+jest.mock("./src/common/middlewares/canAccess", () => ({
+    canAccess: () => jest.fn((req, res, next) => next()),
+}));
+
 import app from "./src/app";
 
 describe("App", () => {

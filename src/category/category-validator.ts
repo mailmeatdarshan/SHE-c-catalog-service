@@ -1,6 +1,6 @@
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 
-export default [
+const categoryValidator = [
     body("name")
         .exists()
         .withMessage("Category name is required")
@@ -86,3 +86,10 @@ export default [
         .isArray()
         .withMessage("availableOptions must be an array"),
 ];
+
+export const categoryUpdateValidator = [
+    param("id").isMongoId().withMessage("Invalid category ID"),
+    ...categoryValidator,
+];
+
+export default categoryValidator;
