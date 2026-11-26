@@ -13,6 +13,14 @@ jest.mock("../common/middlewares/canAccess", () => ({
     canAccess: () => jest.fn((req, res, next) => next()),
 }));
 
+jest.mock("../common/services/S3Storage", () => ({
+    S3Storage: jest.fn().mockImplementation(() => ({
+        upload: jest.fn(),
+        delete: jest.fn(),
+        getObjectUri: jest.fn(),
+    })),
+}));
+
 describe("Category Endpoints", () => {
     afterEach(() => {
         jest.restoreAllMocks();

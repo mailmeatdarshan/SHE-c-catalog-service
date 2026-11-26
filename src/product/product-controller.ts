@@ -1,6 +1,7 @@
 import { NextFunction, Response } from "express";
 import { validationResult } from "express-validator";
 import createHttpError from "http-errors";
+import { v4 as uuidv4 } from "uuid";
 import { Logger } from "winston";
 import { UploadedFile } from "express-fileupload";
 import { ProductService } from "./product-service";
@@ -10,11 +11,13 @@ import {
     ProductPriceConfiguration,
     AttributeValue,
 } from "./product-types";
+import { FileStorage } from "../common/types/storage";
 
 export class ProductController {
     constructor(
         private productService: ProductService,
-        private logger?: Logger,
+        private logger: Logger,
+        private storage: FileStorage,
     ) {}
 
     create = async (
@@ -38,9 +41,14 @@ export class ProductController {
 
         this.logger?.info(`Creating product: ${name}`);
 
-        const image = req.files?.image as UploadedFile | undefined;
-        // todo: image upload to storage (e.g. S3 / Cloudinary)
-        const imageName = image?.name ?? "image.jpg";
+        const image = req.files?.image as UploadedFile;
+
+        const imageName = uuidv4();
+
+        await this.storage.upload({
+            filename: imageName,
+            fileData: image.data,
+        });
 
         const parsedPriceConfiguration =
             typeof priceConfiguration === "string"
@@ -71,6 +79,15 @@ export class ProductController {
             const newProduct = await this.productService.createProduct(product);
             return res.status(201).json({ id: newProduct._id });
         } catch (error: unknown) {
+            try {
+                await this.storage.delete(imageName);
+            } catch (deleteError) {
+                this.logger?.error("Failed to delete orphaned S3 image", {
+                    imageName,
+                    error: deleteError,
+                });
+            }
+
             if ((error as { code?: number })?.code === 11000) {
                 return next(
                     createHttpError(

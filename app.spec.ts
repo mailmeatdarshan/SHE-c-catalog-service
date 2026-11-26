@@ -10,6 +10,14 @@ jest.mock("./src/common/middlewares/canAccess", () => ({
     canAccess: () => jest.fn((req, res, next) => next()),
 }));
 
+jest.mock("./src/common/services/S3Storage", () => ({
+    S3Storage: jest.fn().mockImplementation(() => ({
+        upload: jest.fn(),
+        delete: jest.fn(),
+        getObjectUri: jest.fn(),
+    })),
+}));
+
 import app from "./src/app";
 
 describe("App", () => {
