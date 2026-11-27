@@ -232,8 +232,10 @@ export class ProductController {
         }));
 
         return res.json({
-            ...products,
             data: finalProducts,
+            total: products.total,
+            pageSize: products.limit,
+            currentPage: products.page,
         });
     };
 }
