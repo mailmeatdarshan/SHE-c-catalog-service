@@ -25,4 +25,9 @@ export interface Filter {
     isPublish?: boolean;
 }
 
+export interface PaginateQuery {
+    page: number;
+    limit: number;
+}
+
 export type { Product, ProductPriceConfiguration, AttributeValue };

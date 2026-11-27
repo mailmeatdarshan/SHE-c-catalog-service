@@ -208,16 +208,32 @@ export class ProductController {
 
         this.logger?.info("Fetching products", { q, filters });
 
+        const parsedPage = parseInt(req.query.page as string, 10);
+        const parsedLimit = parseInt(req.query.limit as string, 10);
+        const page =
+            !Number.isNaN(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+        const limit =
+            !Number.isNaN(parsedLimit) && parsedLimit > 0
+                ? Math.min(parsedLimit, 100)
+                : 10;
+
         const products = await this.productService.getProducts(
             q as string | undefined,
             filters,
+            {
+                page,
+                limit,
+            },
         );
 
-        const finalProducts = products.map((product) => ({
+        const finalProducts = (products.data as Product[]).map((product) => ({
             ...product,
             image: this.storage.getObjectUri(product.image),
         }));
 
-        return res.json(finalProducts);
+        return res.json({
+            ...products,
+            data: finalProducts,
+        });
     };
 }
