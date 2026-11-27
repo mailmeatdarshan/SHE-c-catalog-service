@@ -1,6 +1,7 @@
-import { NextFunction, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { validationResult } from "express-validator";
 import createHttpError from "http-errors";
+import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
 import { Logger } from "winston";
 import { UploadedFile } from "express-fileupload";
@@ -11,6 +12,7 @@ import {
     Product,
     ProductPriceConfiguration,
     AttributeValue,
+    Filter,
 } from "./product-types";
 import { FileStorage } from "../common/types/storage";
 
@@ -184,5 +186,38 @@ export class ProductController {
             }
             return next(error);
         }
+    };
+
+    index = async (req: Request, res: Response) => {
+        const { q, categoryId, isPublish } = req.query;
+
+        const filters: Filter = {};
+
+        if (isPublish === "true") {
+            filters.isPublish = true;
+        }
+
+        if (
+            categoryId &&
+            mongoose.Types.ObjectId.isValid(categoryId as string)
+        ) {
+            filters.categoryId = new mongoose.Types.ObjectId(
+                categoryId as string,
+            );
+        }
+
+        this.logger?.info("Fetching products", { q, filters });
+
+        const products = await this.productService.getProducts(
+            q as string | undefined,
+            filters,
+        );
+
+        const finalProducts = products.map((product) => ({
+            ...product,
+            image: this.storage.getObjectUri(product.image),
+        }));
+
+        return res.json(finalProducts);
     };
 }
