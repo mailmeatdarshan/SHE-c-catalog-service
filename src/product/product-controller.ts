@@ -7,6 +7,7 @@ import { UploadedFile } from "express-fileupload";
 import { ProductService } from "./product-service";
 import {
     CreateProductRequest,
+    CreateProductRequestBody,
     Product,
     ProductPriceConfiguration,
     AttributeValue,
@@ -20,16 +21,10 @@ export class ProductController {
         private storage: FileStorage,
     ) {}
 
-    create = async (
-        req: CreateProductRequest,
-        res: Response,
-        next: NextFunction,
-    ) => {
-        const result = validationResult(req);
-        if (!result.isEmpty()) {
-            return next(createHttpError(400, result.array()[0].msg as string));
-        }
-
+    private buildProductPayload(
+        body: CreateProductRequestBody,
+        image: string,
+    ): Product {
         const {
             name,
             description,
@@ -37,18 +32,7 @@ export class ProductController {
             attributes,
             categoryId,
             isPublish,
-        } = req.body;
-
-        this.logger?.info(`Creating product: ${name}`);
-
-        const image = req.files?.image as UploadedFile;
-
-        const imageName = uuidv4();
-
-        await this.storage.upload({
-            filename: imageName,
-            fileData: image.data,
-        });
+        } = body;
 
         const parsedPriceConfiguration =
             typeof priceConfiguration === "string"
@@ -65,27 +49,129 @@ export class ProductController {
                 ? isPublish === "true"
                 : Boolean(isPublish);
 
-        const product: Product = {
+        return {
             name,
             description,
             priceConfiguration: parsedPriceConfiguration,
             attributes: parsedAttributes,
             categoryId,
             isPublish: shouldPublish,
-            image: imageName,
+            image,
         };
+    }
+
+    private async safeDeleteImage(filename: string, context: string) {
+        try {
+            await this.storage.delete(filename);
+        } catch (deleteError) {
+            this.logger?.error(`Failed to delete S3 image (${context})`, {
+                filename,
+                error: deleteError,
+            });
+        }
+    }
+
+    create = async (
+        req: CreateProductRequest,
+        res: Response,
+        next: NextFunction,
+    ) => {
+        const result = validationResult(req);
+        if (!result.isEmpty()) {
+            return next(createHttpError(400, result.array()[0].msg as string));
+        }
+
+        this.logger?.info(`Creating product: ${req.body.name}`);
+
+        const image = req.files?.image as UploadedFile;
+        const imageName = uuidv4();
+
+        await this.storage.upload({
+            filename: imageName,
+            fileData: image.data,
+        });
+
+        const product = this.buildProductPayload(req.body, imageName);
 
         try {
             const newProduct = await this.productService.createProduct(product);
             return res.status(201).json({ id: newProduct._id });
         } catch (error: unknown) {
-            try {
-                await this.storage.delete(imageName);
-            } catch (deleteError) {
-                this.logger?.error("Failed to delete orphaned S3 image", {
-                    imageName,
-                    error: deleteError,
-                });
+            await this.safeDeleteImage(imageName, "create rollback");
+
+            if ((error as { code?: number })?.code === 11000) {
+                return next(
+                    createHttpError(
+                        400,
+                        "Product with this name already exists",
+                    ),
+                );
+            }
+            return next(error);
+        }
+    };
+
+    update = async (
+        req: CreateProductRequest,
+        res: Response,
+        next: NextFunction,
+    ) => {
+        const result = validationResult(req);
+        if (!result.isEmpty()) {
+            return next(createHttpError(400, result.array()[0].msg as string));
+        }
+
+        const { productId } = req.params;
+        this.logger?.info(`Updating product: ${productId}`);
+
+        const oldImage = await this.productService.getProductImage(productId);
+        if (!oldImage) {
+            return next(createHttpError(404, "Product not found"));
+        }
+
+        let newImageName: string | undefined;
+        if (req.files?.image) {
+            const image = req.files.image as UploadedFile;
+            newImageName = uuidv4();
+
+            await this.storage.upload({
+                filename: newImageName,
+                fileData: image.data,
+            });
+        }
+
+        const product = this.buildProductPayload(
+            req.body,
+            newImageName ?? oldImage,
+        );
+
+        try {
+            const updatedProduct = await this.productService.updateProduct(
+                productId,
+                product,
+            );
+
+            if (!updatedProduct) {
+                if (newImageName) {
+                    await this.safeDeleteImage(
+                        newImageName,
+                        "update 404 rollback",
+                    );
+                }
+                return next(createHttpError(404, "Product not found"));
+            }
+
+            if (newImageName) {
+                await this.safeDeleteImage(oldImage, "old image cleanup");
+            }
+
+            return res.json({ id: updatedProduct._id });
+        } catch (error: unknown) {
+            if (newImageName) {
+                await this.safeDeleteImage(
+                    newImageName,
+                    "update error rollback",
+                );
             }
 
             if ((error as { code?: number })?.code === 11000) {

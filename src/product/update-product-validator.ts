@@ -1,6 +1,6 @@
-import { body } from "express-validator";
+import { body, param } from "express-validator";
 
-const productValidator = [
+export const baseProductValidator = [
     body("name")
         .exists()
         .withMessage("Product name is required")
@@ -69,14 +69,11 @@ const productValidator = [
         .withMessage("Category ID is required")
         .isMongoId()
         .withMessage("Category ID must be a valid Mongo ID"),
-
-    body("image").custom((value: unknown, { req }) => {
-        const files = (req as { files?: Record<string, unknown> }).files;
-        if (!files || !files.image) {
-            throw new Error("Product image is required");
-        }
-        return true;
-    }),
 ];
 
-export default productValidator;
+const updateProductValidator = [
+    param("productId").isMongoId().withMessage("Invalid product ID"),
+    ...baseProductValidator,
+];
+
+export default updateProductValidator;
