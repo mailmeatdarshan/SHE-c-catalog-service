@@ -71,9 +71,10 @@ export const baseProductValidator = [
         .withMessage("Category ID must be a valid Mongo ID"),
 ];
 
-const updateProductValidator = [
+export const productIdValidator = [
     param("productId").isMongoId().withMessage("Invalid product ID"),
-    ...baseProductValidator,
 ];
+
+const updateProductValidator = [...productIdValidator, ...baseProductValidator];
 
 export default updateProductValidator;

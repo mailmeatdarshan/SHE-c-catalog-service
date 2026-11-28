@@ -11,7 +11,9 @@ import { ProductController } from "./product-controller";
 import { ProductService } from "./product-service";
 import { CreateProductRequest } from "./product-types";
 import createProductValidator from "./create-product-validator";
-import updateProductValidator from "./update-product-validator";
+import updateProductValidator, {
+    productIdValidator,
+} from "./update-product-validator";
 
 const router = express.Router();
 
@@ -57,6 +59,24 @@ router.get(
     "/",
     asyncWrapper((req: Request, res: Response) =>
         productController.index(req, res),
+    ),
+);
+
+router.get(
+    "/:productId",
+    productIdValidator,
+    asyncWrapper((req: Request, res: Response, next: NextFunction) =>
+        productController.getById(req, res, next),
+    ),
+);
+
+router.delete(
+    "/:productId",
+    authenticate,
+    canAccess([Roles.ADMIN, Roles.MANAGER]),
+    productIdValidator,
+    asyncWrapper((req: Request, res: Response, next: NextFunction) =>
+        productController.delete(req, res, next),
     ),
 );
 

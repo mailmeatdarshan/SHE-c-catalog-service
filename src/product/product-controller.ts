@@ -234,8 +234,48 @@ export class ProductController {
         return res.json({
             data: finalProducts,
             total: products.total,
-            pageSize: products.limit,
-            currentPage: products.page,
+            pageSize: products.pageSize,
+            currentPage: products.currentPage,
         });
+    };
+
+    getById = async (req: Request, res: Response, next: NextFunction) => {
+        const result = validationResult(req);
+        if (!result.isEmpty()) {
+            return next(createHttpError(400, result.array()[0].msg as string));
+        }
+
+        const { productId } = req.params;
+        this.logger?.info(`Fetching product: ${productId}`);
+
+        const product = await this.productService.getProduct(productId);
+        if (!product) {
+            return next(createHttpError(404, "Product not found"));
+        }
+
+        return res.json({
+            ...product,
+            image: this.storage.getObjectUri(product.image),
+        });
+    };
+
+    delete = async (req: Request, res: Response, next: NextFunction) => {
+        const result = validationResult(req);
+        if (!result.isEmpty()) {
+            return next(createHttpError(400, result.array()[0].msg as string));
+        }
+
+        const { productId } = req.params;
+        this.logger?.info(`Deleting product: ${productId}`);
+
+        const deletedProduct =
+            await this.productService.deleteProduct(productId);
+        if (!deletedProduct) {
+            return next(createHttpError(404, "Product not found"));
+        }
+
+        await this.safeDeleteImage(deletedProduct.image, "product delete");
+
+        return res.json({ id: deletedProduct._id });
     };
 }
